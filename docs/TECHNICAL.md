@@ -1,7 +1,9 @@
 # Who has the ball: possession from our own detections and a team HMM
 
 **Team:** gremio · **Members:** Matias Prates, Eduardo Amorim
+
 **Repository:** https://github.com/mtprates/gremio-mtah27
+
 **Submission file:** `gremio.csv`, from `python reproduce.py --team gremio`
 
 ## Summary
