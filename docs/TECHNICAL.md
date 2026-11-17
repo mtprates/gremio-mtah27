@@ -188,106 +188,65 @@ A ball caught by a keeper stays with him until released (rules 36, 48).
 
 From the fused ball and our detected players (`rules.py`):
 
-- **Touch:** a velocity change above 3.5 m/s, with a
-  player within 2 m (a "far touch" up to 4 m, worth less), and not above head height. Touches
-  closer than 6 frames are one touch. Where the ball is unseen for a few frames, the smoother
-  places at most one touch inside the gap; if a stronger velocity change was measured just
-  beside the gap, that measured one is the touch and the fitted one is dropped (rule 58).
+- **Touch:** a change of the ball's velocity of 3.5 m/s or more with a player within 4 m, not above
+  head height; touches closer than 6 frames are one.
 - **Control:** the same team within 1.3 m of the ball for 0.4 s.
 - **Carry:** a player who keeps his pace through a gap in which the ball is unseen.
 - **Bounce:** the landing of a fitted arc with no horizontal change. It is not a touch.
 
 ### 3.5 The decoder: model C
 
-Three states, H, A and D. Per frame, in nats:
+Three hidden states: H, A and D (Figure 2). On every frame each rule below adds evidence, in nats,
+for one state against another; changing state costs a price; Viterbi picks the labels that explain
+all the evidence at once, and a last pass cleans up short spells. Every rule that changes a label:
 
-- **Distance evidence:** the players' distances to the ball, counted once per 0.5 s of
-  correlated frames and capped per frame.
-- **Event evidence:** bonuses for the credited team at each touch, control and carry. A touch is
-  3 nats, a far touch 1.5, a control or carry 4.
-- **Dead-ball evidence:** each signal weighted by its reliability:
-  - the ball out of bounds (graded: longer is surer, rule 27; 3 nats per 0.5 s, 6 once out for 1 s);
-  - the broadcast losing its homography (a cut-away): 2.0 nats present, −1.3 absent, by reasoning
-    (a director cuts away for most of a stoppage and little of live play; no open dataset has a
-    broadcast to measure it on);
-  - players standing still, and overall stillness: precision and recall measured on IDSSE's labels;
-  - the ball's acceleration near zero: its presence counts (weight from IDSSE), its absence does
-    not. On IDSSE a dead ball is parked and visibly still, so "not still" means live there; our
-    ball is missing on many frames (44% unseen) and at a stoppage is mostly unseen or moving, so
-    its absence is not a valid signal on our input.
-- **A still ball during a cut-away (rule 64):** where the broadcast has cut away and the ball is
-  still (over 3 s, the median speed of the frames it is seen on under 1 m/s, seen on at least a
-  third of them), 3 nats per 0.5 s, as sure as the ball out of bounds. A still ball alone is no
-  evidence: a player can hold a live ball at his feet. The cut-away alone is weak; together they
-  are a stoppage.
-- **Kicks (rule 55):** a touch is a kick when all of these hold:
-  - the player is within 2 m;
-  - the ball is seen on both sides of the touch;
-  - the ball is on the ground and did not arrive in a flight;
-  - it leaves at 8 m/s or more, no slower than it came, and away from the player.
+| | rule | what it does | weight | why |
+|---|---|---|---|---|
+| **Who has the ball** | touch (1) | credits a touch to the team of the player within 2 m | 3 nats | less than a switch (5.2): an uncontrolled touch does not change possession (CHALLENGE.md), and tracking jitter makes false touches |
+| | far touch (1, 26) | a touch with the nearest player 2-4 m away, on a ball in the air, or with the ball unseen on one side of it | 1.5 nats | less sure who touched it; an aerial duel won is not control |
+| | control (1.a), carry (2) | the ball held near one team's player | 4 nats | control is what changes possession |
+| | kick (55) | a touch that sends a ground ball off at 8 m/s or more, no slower than it came, away from a player within 2 m, seen on both sides | switch price + 1 | a pass, shot or clearance struck by a player is an act of control; a deflection fails "no slower than it came" |
+| | detection precision (53, 53b) | every event above is multiplied by how sure the ball detections around it are: the weaker side's precision, measured on public images, over the best band's | × 0 to 1 | an event resting on weak detections is doubtful whatever its kind |
+| | measured touch first (58) | where the ball is unseen for a few frames, a stronger change measured beside the gap replaces the one the smoother fits inside it | | the fitted one is the measured kick seen through the smoother's lag |
+| | far touch needs a clear nearest team (60) | a far touch counts only if the other team's nearest player is 1 m or more farther from the ball | 1 m | nearer than that, our position errors cannot tell who touched it |
+| | distances confirm only (59) | the players' distances to the ball may support the team of the latest event, never the other | capped per frame, counted once per 0.5 s | a loose ball stays with the team that last played it |
+| **Dead or live** | out of bounds (27) | the ball beyond a line by 0.5 m for 3 frames, dead from the crossing until the restart | 3 nats per 0.5 s; 6 once out for 1 s; 1 for a short run with nothing after it | Law 9; a lofted ball's ground point leaves the field only briefly |
+| | broadcast cut-away | the broadcast loses its homography (a close-up) | +2.0 present, −1.3 absent | a director cuts away for most of a stoppage and little of live play (reasoned; no open dataset has a broadcast) |
+| | replays neutral (62) | on replay frames the broadcast gives no evidence either way | 0 | a replay shows earlier play |
+| | players still, stillness | most players under 1 m/s; mean player speed under 0.9 m/s with the ball still | precision and recall measured on IDSSE | players stop at a stoppage |
+| | ball acceleration near zero | the ball smooth or still for 1 s | +1.75 present, 0 absent | presence from IDSSE; its absence is not a valid signal on our input, where the ball is unseen on 44% of frames |
+| | still ball in a cut-away (64) | the broadcast has cut away *and* the ball is still (median speed of the frames it is seen on under 1 m/s over 3 s, seen on a third of them or more) | 3 nats | a still ball alone is no evidence (a player can hold a live ball); with a cut-away it is a stoppage |
+| | restart or kick is live (56) | a kick from rest inside the pitch, or any kick | 9 nats against dead, over 1 s | nothing but a restart sends a stationary ball off a player's foot |
+| | before kick-off | the second half before its kick-off | forced dead | the Smart Tagging kick-off |
+| **After decoding** | short spells (63) | a live spell under 5 s between two stoppages becomes dead, unless the ball goes out within 1 s of its end; then a stoppage under 5 s between two spells of the same team, with the cut-away as its only evidence, becomes that team's | 5 s | a touch inside a stoppage reads as a restart; the broadcast alone does not overrule a tactical camera that shows play |
+| **In the ball track** (3.3) | keeper hold (36, 48) | a ball caught by a keeper stays in his hands until released | | no phantom touches during a hold |
 
-  A kick is worth the switch price plus 1 nat, so on confident detections it hands possession to
-  the kicker's team on its own (rule 53 scales it down on weak ones). A pass, shot or clearance struck by a player is an act of control. The 8 m/s cut is
-  above a dribbling push and in the range of a short pass.
-- **Detection precision (rules 53, 53b):** every event's nats are multiplied by how sure the
-  ball detections around it are: the precision of the weaker side's nearest pick, measured by
-  confidence band on public images (Roboflow, CC BY 4.0), over the top band's, at most 1. Below
-  0.25 confidence a detection is the ball less than a third of the time, so a touch, kick,
-  control or carry resting on such picks counts for little, instead of being cut at a
-  confidence floor.
-- **Possession changes only at an event (rule 59):** the distance evidence may only confirm the
-  team credited with the latest touch, kick, control or carry, never flip it. A ball rolling past
-  the other team's players stays with the team that last played it.
-- **Far touches need a clear nearest team (rule 60):** a far touch (2-4 m) counts only when the
-  other team's nearest player is at least 1 m farther from the ball; nearer than that, our
-  position errors cannot tell who touched it.
-- **Live evidence (rule 56):** a restart (a ball kicked from rest inside the pitch), or any
-  kick, gives 9 nats against dead ball, spread over the next second.
-- **Replays are neutral (rule 62):** a broadcast replay shows earlier play, so on replay frames the
-  broadcast gives no evidence either way. Before, a replay's homography read as "the broadcast is
-  not cut away", which counted as live evidence during a stoppage.
-- **Transitions:** prices from mean lengths measured on IDSSE's labels:
-  - H ↔ A: log(7.2 s × 25) ≈ 5.2 nats (mean possession 7.2 s);
-  - live → dead: from a 31.2 s mean live stretch;
-  - dead → live: from a 25.3 s mean stoppage.
-- The second half is forced dead before its kick-off.
-
-Viterbi gives the labels, and forward-backward a per-frame confidence for the viewer. One pass
-then cleans up short spells (rule 63), in this order:
-
-1. A live spell shorter than 5 s between two stoppages becomes dead, unless the ball leaves the
-   pitch within 1 s of its end. Inside a stoppage the ball is often moved (passed back to the
-   keeper, to the taker) and a touch reads as a restart; real play that short almost always ends
-   with the ball going out.
-2. A stoppage shorter than 5 s between two spells of the same team becomes that team's, when the
-   broadcast's close-up is its only dead-ball evidence: the broadcast alone does not overrule a
-   tactical camera that shows play going on.
-
-The window is 5 s, a round value set by reasoning, not tuned. Spot checks on BAR-ATH found both
-patterns; on the external matches the window makes little difference (4, 5 and 6 s differ by
-under 0.002 on IDSSE), and the rule's targets, false restarts inside a stoppage and broadcast
-cut-aways, are artefacts of our own input that the external data does not have. The
-submitted file writes `X` only on the 40,462 ungraded frames (before kick-off, half-time, after
-the final whistle). Every graded frame gets H, A or D.
+Changing state costs log(mean length × 25 fps), with the mean lengths of possessions (7.2 s),
+live play (31.2 s) and stoppages (25.3 s) on IDSSE's labels: H ↔ A 5.2 nats, live → dead 6.7,
+dead → live 7.1. Rule 63's 5 s window is a round value set by reasoning (4, 5 and 6 s differ by under
+0.002 on IDSSE; its targets are artefacts of our own input that the external data does not have).
+Every value and its basis is in `docs/VALUES.md`. The submitted file writes `X` only on the 40,462
+ungraded frames (before kick-off, half-time, after the final whistle); every graded frame gets H, A
+or D.
 
 ## 4. The possession rules we implemented
 
 CHALLENGE.md defines a change of possession as an opponent gaining **controlled** possession.
-Where we drew the line:
+Where we drew the line, situation by situation (rule numbers from the table in 3.5):
 
-| situation | our rule |
+| situation | how the model decides it |
 |---|---|
-| **A single touch** by the other team | Not enough by itself: 3 nats against a 5.2-nat switch. It needs one more touch, a control or a carry, or the distance evidence. This follows CHALLENGE.md's "a simple touch without control" does not change possession. |
-| **A kick** by the other team (rule 55): a ground ball sent off at 8 m/s or more, faster than it came, away from the player | Changes possession on its own: an interception struck straight on is control, even with no dwell. A deflection fails the "faster than it came" test. |
-| **A deflection** (the ball keeps its course) | No velocity change above 3.5 m/s, so no touch. |
-| **A header or aerial duel** | A touch in the air is weak (rule 26, `air_touch`). Possession follows whoever controls the ball afterwards. |
-| **A loose or contested ball** | Possession changes only at an event (rule 59): the players' distances cannot hand a loose ball to the nearer team, so the previous possessor keeps it until the other side touches, kicks, controls or carries it. A far touch between two equally near opponents counts for nobody (rule 60). |
-| **A challenge (tackle)** | A tackle that wins the ball shows up as the tackler's team's control or carry. One that only knocks it loose stays with the previous team, as above. |
-| **A ball out of bounds** | Dead from the moment it crosses the line, by more than 0.5 m for 3 frames, until the restart. |
-| **A stoppage** (foul, injury) | Dead when the players are mostly still or the broadcast cuts away, and surely so when the ball lies still while the broadcast has cut away (rule 64). A cut-away under 5 s inside one team's possession, with nothing on the tactical camera to support it, is not a stoppage (rule 63). Replays say nothing either way (rule 62). |
-| **A restart** | Live from the restart touch (rule 56 adds live evidence there). A "restart" followed by a stoppage within 5 s, with no ball going out, was the ball being set up, not play (rule 63). The team taking it gets the touch evidence, so the restarting team has the ball (CHALLENGE.md: "a clear possessor"). |
-| **A goalkeeper's catch** | The keeper holds the ball until release (rules 36, 48): his team's possession, with no phantom touches during the hold. |
-| **Before kick-off / half-time** | Forced dead, from the Smart Tagging kick-offs. |
+| **A single touch** by the other team | Not enough by itself (touch, 1): it needs a second touch, a control, a carry or a kick. CHALLENGE.md: "a simple touch without control" does not change possession. |
+| **A kick** by the other team | Changes possession on its own (55): an interception struck straight on is control, even with no dwell. |
+| **A deflection** | Either no touch at all (the ball keeps its course), or a touch that fails the kick's "no slower than it came" test: not enough by itself. |
+| **A header or aerial duel** | A far touch (26): possession follows whoever controls the ball afterwards. |
+| **A loose or contested ball** | Stays with the team that last played it (59), until the other side touches, kicks, controls or carries it; a far touch between two equally near opponents counts for nobody (60). |
+| **A tackle** | One that wins the ball shows up as the tackler's team's control or carry; one that only knocks it loose stays with the previous team, as a loose ball. |
+| **A ball out of bounds** | Dead from the crossing until the restart (27). |
+| **A stoppage** (foul, injury) | Dead when the players are still or the broadcast cuts away, and surely so when the ball lies still during a cut-away (64). A cut-away under 5 s inside one team's possession, with nothing on the tactical camera to support it, is not a stoppage (63); replays say nothing (62). |
+| **A restart** | Live from the restart kick (56); the team taking it gets the touch, so the restarting team has the ball (CHALLENGE.md: "a clear possessor"). A "restart" followed by a stoppage within 5 s, with no ball going out, was the ball being set up (63). |
+| **A goalkeeper's catch** | His team's possession, held until release (36, 48). |
+| **Before kick-off / half-time** | Forced dead. |
 
 ## 5. Results
 
