@@ -160,32 +160,6 @@ def hmm_states():
 
 
 # -- 4. external validation, per game ----------------------------------------------------------------
-def external_scores():
-    rows = list(csv.DictReader(open(os.path.join(ROOT, "validation", "readiness_games.csv"), newline="")))
-    games = sorted({r["game"] for r in rows})
-    show = (("truth 1 s late", "ground truth 1 s late (scale)", MUTED),
-            ("R1", "R1: every touch hands over", ORANGE),
-            ("before (2026-11-16)", "model C, 2026-11-16", AQUA),
-            ("submitted", "submitted model", BLUE))
-    fig, axes = plt.subplots(1, 2, figsize=(10, 3.9), sharey=False)
-    for ax, metric, label in ((axes[0], "spell_f1", "spellF1 (ranking metric)"), (axes[1], "macro_f1", "macroF1")):
-        y = np.arange(len(games))
-        for k, (model, name, color) in enumerate(show):
-            vals = [float(next(r[metric] for r in rows if r["game"] == g and r["model"] == model)) for g in games]
-            ax.plot(vals, y + (k - 1.5) * 0.16, marker="o", markersize=6.5, linestyle="none", color=color,
-                    markeredgecolor=SURFACE, markeredgewidth=1.2, label=name)
-        ax.set_yticks(y)
-        ax.set_yticklabels([g.replace("idsse_", "IDSSE ").replace("metrica_", "Metrica ") for g in games], fontsize=8)
-        ax.set_xlabel(label)
-        ax.grid(axis="y", visible=False)
-        ax.invert_yaxis()
-    axes[1].set_yticklabels([])
-    axes[0].legend(loc="upper center", bbox_to_anchor=(1.05, -0.17), ncol=4, fontsize=8)
-    fig.suptitle("Clean optical tracking from 10 public matches (not BAR-ATH), one point per match", fontsize=10,
-                 x=0.02, ha="left")
-    save(fig, "external_scores.png")
-
-
 # -- 5. finding 5: matched possessions by true length --------------------------------------------------
 def by_length():
     rows = list(csv.DictReader(open(os.path.join(ROOT, "validation", "readiness_sets.csv"), newline="")))
@@ -217,5 +191,4 @@ if __name__ == "__main__":
     pipeline()
     line_of_sight()
     hmm_states()
-    external_scores()
     by_length()
