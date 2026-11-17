@@ -1,0 +1,24 @@
+# The match data is licensed to each participant: never commit it, or anything derived from it.
+data/*
+!data/README.md
+*.mp4
+submission/
+evaluation/results/*.csv
+evaluation/reports/
+evaluation/scoreboard.csv
+
+# External public datasets (downloaded by hand; external/README.md) and what the scripts rebuild
+external/*
+!external/README.md
+validation/gt/
+validation/predictions/
+validation/reports/
+
+# Model weights (downloaded on first use), logs, environments
+weights/
+*.pt
+logs/
+.venv/
+__pycache__/
+*.py[cod]
+.DS_Store

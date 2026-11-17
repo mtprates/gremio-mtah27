@@ -1,0 +1,8 @@
+# Only to re-run the slow steps from the video (YOLO detections, team labels): model/detect_all.py,
+# model/teams.py, model/pitch.py. Not needed with our shared derived outputs (README.md). Install torch for
+# your GPU first (https://pytorch.org/get-started/locally/); built with torch 2.14.1+cu126 and
+# torchvision 0.29.1+cu126 on Python 3.13 (the +cu126 suffix comes from PyTorch's CUDA index).
+-r requirements-model.txt
+torch==2.14.1
+torchvision==0.29.1
+ultralytics==8.4.183

@@ -1,0 +1,14 @@
+# The possession models, the ball track and the analysis scripts (model/), on top of the scorer's two
+# lines. Enough to run model/iterate.py from our shared derived outputs (README.md). Pinned to the
+# versions the submission was built with (Python 3.13), so the file regenerates exactly.
+-r requirements.txt
+numpy==2.5.2
+pandas==3.1.0
+scipy==1.18.1
+scikit-learn==1.9.1
+matplotlib==3.11.2
+pillow==12.3.0
+pyyaml==6.0.3
+opencv-python==5.0.0.93
+av==19.0.2
+kloppy==3.19.1
