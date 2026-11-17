@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 gremio (Matias Prates)
+Copyright (c) 2026 gremio (Matias Prates, Eduardo Amorim)
 
 This licence covers our code and documents in this repository. Files from Metrica Sports' challenge
 repository (evaluation/, games.py, starter/load_smart_tagging.py, data/README.md, requirements.txt) are

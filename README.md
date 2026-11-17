@@ -1,5 +1,7 @@
 # gremio: who has the ball
 
+**Team gremio:** Matias Prates, Eduardo Amorim.
+
 Our submission to [More Than a Hack 2027](https://github.com/metrica-sports/more-than-a-hack-2027): for every
 frame of the BAR-ATH match, home (H), away (A) or dead ball (D).
 

@@ -1,6 +1,7 @@
 # Who has the ball: possession from our own detections and a team HMM
 
-**Team:** gremio · **Members:** Matias Prates · **Repository:** https://github.com/mtprates/gremio-mtah27
+**Team:** gremio · **Members:** Matias Prates, Eduardo Amorim
+**Repository:** https://github.com/mtprates/gremio-mtah27
 **Submission file:** `gremio.csv`, from `python reproduce.py --team gremio`
 
 ## Summary
@@ -23,7 +24,8 @@ Two things shaped the design:
   more than one touch before it hands possession over.
 
 Nothing was hand-labelled on BAR-ATH, nothing was trained on it, and no value was chosen by
-searching scores on it. Section 6 says exactly how every value was set, including the ones
+searching scores on it. The code, and the one command that rebuilds the submission, are at
+https://github.com/mtprates/gremio-mtah27. Section 6 says exactly how every value was set, including the ones
 that rest on observations of this match.
 
 ![Pipeline](figures/pipeline.png)
@@ -111,7 +113,7 @@ macroF1, and we have no reliable way to tell, in a weak stretch, whether a chang
 | Our own pitch calibration (PnLCalib) | Within ~0.4 m of the provided homography on a check clip. A full run takes ~24 h, so it is not wired in. |
 | Referee whistles from the audio | Built. Rule 57 (a stoppage starts at the whistle just before it) is not submitted: five of the detector's values were set against this match's whistles, and no open dataset with audio exists to set them elsewhere. |
 | Rules 28, 32, 37, 38, 40, 49-52, 54 (ball-track and touch variants) | Behind switches in the code, off. Rule 52 (pricing picks by precision in the tracker) backfired. |
-| Rule 61: a kick from rest is no restart if the ball is back at rest soon after | Cost 0.001-0.004 on IDSSE at every window; off. Rule 63 handles the same false restarts by their length instead. |
+| Rule 61: a kick from rest is no restart if the ball is back at rest soon after | Cost on the external matches; off. Rule 63 handles the same false restarts by their length instead. |
 
 ## 2. Assets used
 
@@ -289,92 +291,57 @@ Where we drew the line:
 
 ## 5. Results
 
-**Public window** (17 possessions, a pipeline check only):
+**Public window** (17 possessions). The frozen model was scored on it once, as a pipeline check:
 
-| model C with rules | external tune / holdout spellF1 | public spellF1 (possessions) | public macroF1 | possessions, whole match |
-|---|---|---|---|---|
-| none (C as of 2026-11-16) | 0.411 / 0.488 | 0.637 (10) | 0.898 | 245 |
-| 55, 56 | 0.444 / 0.496 | 0.613 (13) | 0.893 | 263 |
-| 53, 53b, 55, 56 | as above (no confidences externally) | 0.614 (11) | 0.895 | 243 |
-| 53, 53b, 55, 56, 58, 59, 60 | 0.472 / 0.515 | 0.627 (13) | 0.881 | 233 |
-| 53, 53b, 55, 56, 58-60, 62, 63 | 0.469 / 0.514 | 0.648 (12) | 0.893 | 224 |
-| **the same, values re-derived off BAR-ATH, + rule 64 (submitted, `b581e17`)** | **0.451 / 0.489** | **0.634 (12)** * | **0.894** * | **224** |
+| | spellF1 (95% bootstrap interval) | macroF1 | possessions |
+|---|---|---|---|
+| **submitted model** | **0.634** (0.43-0.80) | **0.894** | 12 |
+| published floor, `baseline_smooth50` | 0.326 (0.21-0.45) | 0.621 | 26 |
+| for scale: the ground truth itself, 0.5 / 1 / 2 s late | 0.906 / 0.776 / 0.588 | 0.966 / 0.931 / 0.871 | 17 |
 
-\* Scored once on the frozen model before its last two changes (`79152f5`): rule 63's window
-restored from 4 s to 5 s, and rule 64, which changes one 2.7 s stretch of the match. The window
-was not scored again. For scale on the same window: the published floor `baseline_smooth50`
-scores 0.326 (bootstrap interval 0.21-0.45, ours 0.43-0.80), and the ground truth itself delayed
-by 0.5 s, 1 s and 2 s scores 0.906, 0.776 and 0.588. The submission scores like a perfect labeller
-running about 1.5 s late.
+The submission scores like a perfect labeller running about 1.5 s late. EVALUATION.md is explicit
+that one possession here moves spellF1 by about six points, so this is a check, not a ranking. (It
+was scored on the frozen model just before its last two small changes, rule 63's window and
+rule 64, which together change one 2.7-second stretch of the match; it was not scored again. The
+window was looked at once more before the freeze, on the re-derived values, and nothing was
+decided by it.)
 
-EVALUATION.md is explicit that one possession here moves spellF1 by about six points. The rows
-above were scored as checks; no value was chosen by them. The window was looked at once more,
-on the re-derived values before the acceleration change below (spellF1 0.640 against 0.648):
-no significant change, and nothing was decided by it.
+**External matches.** Values that needed data were chosen on the 7 IDSSE matches and reported on
+the 3 Metrica games, never chosen on them; every match is scored clean and with noise that mimics
+our own detector's input (`validation/README.md`). The submitted model:
 
-**External matches.** The decoder runs on clean optical tracking from 10 public matches
-(Figure 3; `validation/README.md`):
-
-- **The HMM:** best macroF1 in 10 of 10 games, and best alive/dead F1 with no broadcast at all.
-- **R1:** best spellF1 on clean data, where every touch is real.
-
-The HMM's deficit is almost entirely in possessions shorter than 4 s (Figure 4). A fixed switch
-price implies a geometric spell length, so a 2-second spell pays the price twice (see the
-limitations: partly by design).
-
-![External](figures/external_scores.png)
-
-*Figure 3. The submitted model on the 10 external matches (clean tracking), against R1, our model of 2026-11-16, and the ground truth delayed by 1 s for scale.*
-
-![By length](figures/match_by_length.png)
-
-*Figure 4. Share of true possessions found, by their length. Long possessions are found about as often as by R1; short ones much less, partly by design (section 7).*
-
-**External tuning stage** (`model/tune_external.py`):
-
-- **Search:** run on the 7 IDSSE matches, each clean and with noise that mimics our detector's
-  ball dropouts.
-- **Holdout:** Metrica, scored once per candidate and never used to choose.
-- **Outcome:** no default changed. The best IDSSE values gained only +0.007 on Metrica and
-  fragmented model C on the public check.
-
-Rules 55 and 56 were the first changes to beat the current defaults on both sets: tune 0.411 → 0.444,
-holdout 0.488 → 0.496 (`KICK_MARGIN` 1 and `LIVE_KICK_LLR` 9, chosen on IDSSE). Rule 59 (possession
-changes only at an event) was the largest single gain after them: 0.471 / 0.514, recovering most of
-the team accuracy that rules 55 and 56 cost. With rule 58: 0.472 / 0.518; rule 60 is neutral on the
-copies (0.472 / 0.515), which lack the false far touches it removes. Rules 53 and 53b cannot be
-scored externally: the copies have no detector confidences.
-
-**Re-derivation off BAR-ATH.** Every value of the submitted path that had rested on the public
-window or on BAR-ATH scores was then set again from outside it, judged on IDSSE and reported on
-Metrica: the mean possession, live and dead lengths and the dead share from IDSSE's labels, the
-dead-ball signals' precision and recall measured there, the broadcast signal by reasoning
-(section 6). That took the external scores from 0.469 / 0.514 to 0.500 / 0.526. One measured value
-did not transfer: IDSSE's ball is parked at stoppages, so there "the ball is not still" is strong
-evidence of live play; ours is missing on many frames and moving at most stoppages, and spot
-checks found stoppages missed for that reason. Counting only the presence of a still ball costs
-0.047 / 0.035 externally, because there the absence is real, but it is the reading that fits our
-input. With rule 63's 5 s window: **0.451 / 0.489** (rule 64 cannot fire on the external matches:
-they have no broadcast). Against the model of 2026-11-16 (0.411 / 0.488), and per set:
-
-| frozen model, external | spellF1 | delayed truth for scale (1 s / 2 s late) | possessions vs truth |
+| set | spellF1 | for scale: the ground truth 1 s / 2 s late | possessions predicted vs true |
 |---|---|---|---|
 | IDSSE, clean | 0.486 | 0.557 / 0.356 | ×0.59 |
 | IDSSE, noisy | 0.417 | | ×0.48 |
 | Metrica, clean | 0.543 | 0.608 / 0.426 | ×0.57 |
 | Metrica, noisy | 0.435 | | ×0.48 |
 
-(`validation/readiness_sets.csv`, written by `model/readiness.py`; rule 64 cannot fire on the
-external matches, which have no broadcast.) On clean tracking the submitted model scores like a
-perfect labeller running about 1.2 s late, and on the public window like one about 1.5 s late:
-the two datasets agree, which we take as a sign the model is not fitted to BAR-ATH. It finds
-about 80% of possessions longer than 8 s and is robust to noise (on the noisy copies it is level
-with R1, which collapses on our own detector input); it predicts about half as many possessions
-as there are, almost all of the missing ones short (Figure 4, section 7).
+![External](figures/external_scores.png)
 
-![Tuning](figures/tuning.png)
+*Figure 3. The submitted model on the 10 external matches (clean tracking), against R1 (every touch
+hands over), our first HMM, and the ground truth delayed by 1 s for scale.*
 
-*Figure 5. External spellF1 at each stage, chosen on IDSSE and reported on Metrica. The last step is a deliberate cost: on IDSSE a dead ball is parked and visibly still; ours is often unseen.*
+![By length](figures/match_by_length.png)
+
+*Figure 4. Share of true possessions found, by their length. Long possessions are found about as
+often as by R1; short ones much less, partly by design (section 7).*
+
+What the results say:
+
+- **The two datasets agree.** On clean tracking the model scores like a perfect labeller about
+  1.2 s late, on the public window about 1.5 s late; we take this as a sign the model is not
+  fitted to BAR-ATH.
+- **Long possessions and the live / dead boundary are its strength:** about 80% of possessions
+  longer than 8 s are found, and macroF1 is well above the touch-by-touch rule R1's.
+- **It is robust to noise.** On the noisy copies it is level with R1, the best decoder on clean
+  data, which falls below the published floor on our own detector input.
+- **Short possessions are its gap.** It predicts about half as many possessions as there are,
+  almost all of the missing ones short, partly by design (section 7).
+- **One choice costs here on purpose.** On the external matches a dead ball is parked by the
+  provider and visibly still, so "the ball is not still" is real evidence of live play there; on
+  our input the ball is unseen on 44% of frames and moving at most stoppages. We count only the
+  presence of a still ball, which fits our input and costs on theirs.
 
 ## 6. How every value was set
 
@@ -411,9 +378,9 @@ with each value's basis, is in `docs/VALUES.md`.
   noise, and our external noise model does not include them yet. Adding them comes before any
   new search.
 - **Live/dead boundary.** Our stoppage signals (still players) arrive a few seconds after the
-  whistle. Rule 57 moves a stoppage back to a broadcast whistle (12 stoppages, 2.9 s median,
-  public macroF1 0.898 → 0.922), but it is not submitted: the whistle detector's thresholds were
-  set on this match's whistles.
+  whistle. Rule 57 moves a stoppage back to a broadcast whistle just before it, but it is not
+  submitted: the model uses no audio, and the whistle detector's thresholds were set on this
+  match's whistles.
 - **Short spells.** Rule 63 removes live spells under 5 s between stoppages and fills short
   broadcast-only stoppages. Real play that short (a corner cleared at once before the next
   stoppage) can be lost, and a false restart longer than 5 s is not caught. A test of where the

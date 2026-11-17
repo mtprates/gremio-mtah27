@@ -24,7 +24,7 @@ BAR-ATH score estimate. Download steps: `external/README.md`.
 ## The submitted model
 
 Model C with the submission's rules, against references. `readiness_sets.csv` and `readiness_games.csv`
-(written by `model/readiness.py`); figures 3-5 in `docs/TECHNICAL.md`.
+(written by `model/readiness.py`); figures 3-4 in `docs/TECHNICAL.md`.
 
 | set | model | spellF1 | macroF1 | possessions vs truth | found, true length < 2 s / 2-4 / 4-8 / > 8 s |
 |---|---|---|---|---|---|

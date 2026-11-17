@@ -3,8 +3,7 @@
     .venv/Scripts/python docs/make_figures.py      # -> docs/figures/*.png
 
 Reads only committed, non-match files (validation/readiness_sets.csv and readiness_games.csv from
-model/readiness.py; the model's own constants in model/hmm.py) and draws schematics. The progression figure's
-numbers are the external scores recorded in docs/VALUES.md. Nothing here opens the BAR-ATH data.
+model/readiness.py; the model's own constants in model/hmm.py) and draws schematics. Nothing here opens the BAR-ATH data.
 """
 
 import csv
@@ -214,41 +213,9 @@ def by_length():
     save(fig, "match_by_length.png")
 
 
-# -- 6. external tuning: tune vs held-out --------------------------------------------------------------
-def tuning():
-    # External spellF1 (tune: IDSSE 7 matches x clean/noisy, chosen on; holdout: Metrica 3 matches x clean/noisy),
-    # as recorded in docs/VALUES.md for each stage.
-    stages = [
-        ("model C, 2026-11-16", 0.411, 0.488),
-        ("+ 55 kick, 56 restart-live", 0.444, 0.496),
-        ("+ 58-60 echo, event-switch, far-clear", 0.472, 0.515),
-        ("+ 62, 63 replays, short spells", 0.469, 0.514),
-        ("values re-derived off BAR-ATH (IDSSE)", 0.500, 0.526),
-        ("submitted: acceleration presence only", 0.451, 0.489),
-    ]
-    fig, ax = plt.subplots(figsize=(9.5, 3.4))
-    y = np.arange(len(stages))
-    for i, (n, a, b) in enumerate(stages):
-        ax.plot([a, b], [i, i], color=GRID, linewidth=2, zorder=1)
-    ax.plot([p[1] for p in stages], y, "o", color=ORANGE, markersize=8, markeredgecolor=SURFACE,
-            markeredgewidth=1.5, label="tune: IDSSE (chosen on)")
-    ax.plot([p[2] for p in stages], y, "o", color=BLUE, markersize=8, markeredgecolor=SURFACE,
-            markeredgewidth=1.5, label="held out: Metrica (never chosen on)")
-    ax.set_yticks(y)
-    ax.set_yticklabels([p[0] for p in stages], fontsize=8.5)
-    ax.invert_yaxis()
-    ax.grid(axis="y", visible=False)
-    ax.set_xlabel("mean spellF1 on the external matches (clean and noisy copies)")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.45, -0.22), ncol=2, fontsize=8.5)
-    ax.set_title("From the first model to the submission. The last step costs externally on purpose:\n"
-                 "IDSSE's ball is parked at stoppages, ours is often missing", fontsize=9, loc="left")
-    save(fig, "tuning.png")
-
-
 if __name__ == "__main__":
     pipeline()
     line_of_sight()
     hmm_states()
     external_scores()
     by_length()
-    tuning()
